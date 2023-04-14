@@ -1,9 +1,18 @@
 import Image from 'next/image'
 import { Inter } from 'next/font/google'
 
+import Editor from '@monaco-editor/react';
+
 const inter = Inter({ subsets: ['latin'] })
 
 export default function Home() {
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <Editor height="100vh" defaultLanguage="python" defaultValue="# automate away!" />
+      <div />
+    </div>
+  );
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-24">
       <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
