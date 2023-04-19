@@ -7,18 +7,21 @@ module.exports = async (req: any, res: any) => {
   // For example, for the URL "/api/hello/world", "params" will be ["hello", "world"]
   const { params } = req.query;
 
-  const target = `http://localhost:${req.cookies.serverInternalSimulatorPort}/${params.join('/')}`;
+  const target = `http://localhost:${
+    req.cookies.serverInternalSimulatorPort
+  }/${params.join('/')}`;
 
   try {
     // Forward the original headers, excluding the "host" header
     const headers = { ...req.headers };
     delete headers.host;
-    
+
     // Set up fetch options to include original method, headers, cookies, and body
     const fetchOptions = {
       method: req.method,
       headers: headers,
-      body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
+      body:
+        req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
     };
 
     // Make a request to the target endpoint
@@ -29,7 +32,7 @@ module.exports = async (req: any, res: any) => {
 
     response.headers.forEach((value, name) => {
       res.setHeader(name, value);
-    });      
+    });
 
     // Return the response data as plain text with the same status code
     res.status(response.status).send(data);
@@ -42,7 +45,7 @@ module.exports = async (req: any, res: any) => {
 // Add the config to allow the API route to handle the proxy
 module.exports.config = {
   api: {
-    bodyParser: false,  // prevent Next.js from interfering with request bodies
-    externalResolver: true,  // let Next.js know that we can be responsible for all responses returned
+    bodyParser: false, // prevent Next.js from interfering with request bodies
+    externalResolver: true, // let Next.js know that we can be responsible for all responses returned
   },
 };

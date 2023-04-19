@@ -4,13 +4,15 @@ import Editor from '@monaco-editor/react';
 
 import React, { useState } from 'react';
 
-const SimulatorPane = ({ scriptCode } : { scriptCode: string }) => {
-  const [simulatorLoadingState, setSimulatorLoadingState] = useState<'INACTIVE' | 'LOADING' | 'LOADED'>('INACTIVE');
+const SimulatorPane = ({ scriptCode }: { scriptCode: string }) => {
+  const [simulatorLoadingState, setSimulatorLoadingState] = useState<
+    'INACTIVE' | 'LOADING' | 'LOADED'
+  >('INACTIVE');
 
   // Define a function to fetch data on button click
   const fetchData = () => {
     // Define the URL for the API route based on its location within pages/api
-    const apiUrl = "/api/simulator/runScript";
+    const apiUrl = '/api/simulator/runScript';
 
     setSimulatorLoadingState('LOADING');
 
@@ -22,14 +24,13 @@ const SimulatorPane = ({ scriptCode } : { scriptCode: string }) => {
     })
       .then((response) => response.json())
       .then((data) => {
-        Cookies.set("serverInternalSimulatorPort", data.http_port);
-        Cookies.set("serverInternalSimulatorWebsocketPort", data.ws_port);
+        Cookies.set('serverInternalSimulatorPort', data.http_port);
+        Cookies.set('serverInternalSimulatorWebsocketPort', data.ws_port);
         // setTimeout is needed because the iframe will fail to load if it is instantiated too soon.
         setTimeout(() => setSimulatorLoadingState('LOADED'), 1000);
       })
       .catch((error) => console.error(error));
   };
-
 
   if (simulatorLoadingState === 'LOADED') {
     return (
@@ -46,11 +47,13 @@ const SimulatorPane = ({ scriptCode } : { scriptCode: string }) => {
       <div className="h-full flex justify-center items-center text-5xl bg-neutral-900">
         LOADING...
       </div>
-    )
+    );
   }
 
   if (scriptCode.trim().length === 0) {
-    return <div className="h-full flex justify-center items-center text-5xl bg-neutral-900" />;
+    return (
+      <div className="h-full flex justify-center items-center text-5xl bg-neutral-900" />
+    );
   }
 
   return (
@@ -142,7 +145,7 @@ export default function Home() {
 
   return (
     <div className="grid grid-cols-2 gap-4">
-      <Editor 
+      <Editor
         className="h-screen"
         theme="vs-dark"
         onChange={(value) => {

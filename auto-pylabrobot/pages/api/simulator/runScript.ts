@@ -1,4 +1,3 @@
-
 module.exports = async (req: any, res: any) => {
   if (req.method !== 'POST') {
     res.status(405).json({ message: 'Method Not Allowed' });

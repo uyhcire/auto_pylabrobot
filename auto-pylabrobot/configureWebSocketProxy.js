@@ -3,9 +3,11 @@ const WebSocket = require('ws');
 function configureWebSocketProxy(app, proxyRoute) {
   app.get(proxyRoute, (req, res) => {
     const wss = new WebSocket.Server({ noServer: true });
-    
+
     wss.handleUpgrade(req, res.socket, Buffer.alloc(0), (client) => {
-      const target = new WebSocket(`ws://localhost:${req.cookies.serverInternalSimulatorWebsocketPort}`);
+      const target = new WebSocket(
+        `ws://localhost:${req.cookies.serverInternalSimulatorWebsocketPort}`
+      );
 
       const clientMessageBuffer = []; // Buffer to store client messages
 
@@ -41,8 +43,7 @@ function configureWebSocketProxy(app, proxyRoute) {
         client.close();
       });
 
-      target.on('error', (error) => {
-      });
+      target.on('error', (error) => {});
     });
   });
 }
