@@ -54,7 +54,11 @@ def run_script(payload: CodePayload):
         subprocess.Popen(docker_command)
 
         return JSONResponse(
-            content={"message": "Simulator container successfully launched.", "http_port": http_port, "ws_port": ws_port}
+            content={
+                "message": "Simulator container successfully launched.",
+                "http_port": http_port,
+                "ws_port": ws_port,
+            }
         )
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
