@@ -1,133 +1,157 @@
-import Image from 'next/image'
-import { Inter } from 'next/font/google'
+import Cookies from 'js-cookie';
 
 import Editor from '@monaco-editor/react';
 
-const inter = Inter({ subsets: ['latin'] })
+import React, { useState } from 'react';
 
-export default function Home() {
+const SimulatorPane = ({ scriptCode } : { scriptCode: string }) => {
+  const [simulatorLoadingState, setSimulatorLoadingState] = useState<'INACTIVE' | 'LOADING' | 'LOADED'>('INACTIVE');
+
+  // Define a function to fetch data on button click
+  const fetchData = () => {
+    // Define the URL for the API route based on its location within pages/api
+    const apiUrl = "/api/simulator/runScript";
+
+    setSimulatorLoadingState('LOADING');
+
+    // Make a fetch request to the API route
+    fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scriptCode }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        Cookies.set("serverInternalSimulatorPort", data.http_port);
+        Cookies.set("serverInternalSimulatorWebsocketPort", data.ws_port);
+        // setTimeout is needed because the iframe will fail to load if it is instantiated too soon.
+        setTimeout(() => setSimulatorLoadingState('LOADED'), 1000);
+      })
+      .catch((error) => console.error(error));
+  };
+
+
+  if (simulatorLoadingState === 'LOADED') {
+    return (
+      <iframe
+        className="w-full h-full"
+        // The index.html is necessary to ensure that /api/simulator/proxy/ is the base URL for all HTTP requests to the simulator
+        src="/api/simulator/proxy/index.html"
+      />
+    );
+  }
+
+  if (simulatorLoadingState === 'LOADING') {
+    return (
+      <div className="h-full flex justify-center items-center text-5xl bg-neutral-900">
+        LOADING...
+      </div>
+    )
+  }
+
+  if (scriptCode.trim().length === 0) {
+    return <div className="h-full flex justify-center items-center text-5xl bg-neutral-900" />;
+  }
+
   return (
-    <div className="grid grid-cols-2 gap-4">
-      <Editor height="100vh" defaultLanguage="python" defaultValue="# automate away!" />
-      <div />
+    <div
+      className="h-full flex justify-center items-center text-5xl bg-neutral-900 hover:bg-blue-800 hover:cursor-pointer"
+      onClick={fetchData}
+    >
+      SIMULATE
     </div>
   );
+};
+
+const DEFAULT_SCRIPT_CODE = `import asyncio
+
+from pylabrobot.liquid_handling import LiquidHandler
+from pylabrobot.liquid_handling.backends.simulation.simulator_backend import SimulatorBackend
+from pylabrobot.resources.hamilton import STARLetDeck
+from pylabrobot.resources import (
+    TIP_CAR_480_A00,
+    PLT_CAR_L5AC_A00,
+    Cos_96_DW_1mL,
+    HTF_L,
+    STF_L
+)
+
+async def main():
+    sb = SimulatorBackend(open_browser=False)
+    lh = LiquidHandler(backend=sb, deck=STARLetDeck())
+
+    await lh.setup()
+
+    sb.wait_for_connection()
+
+    tip_car = TIP_CAR_480_A00(name='tip carrier')
+    tip_car[0] = tips = HTF_L(name='tips_01')
+    tip_car[1] = HTF_L(name='tips_02')
+    tip_car[2] = HTF_L(name='tips_03')
+    tip_car[3] = HTF_L(name='tips_04')
+    tip_car[4] = HTF_L(name='tips_05')
+
+    lh.deck.assign_child_resource(tip_car, rails=15)
+
+    plt_car = PLT_CAR_L5AC_A00(name='plate carrier')
+    plt_car[0] = plate = Cos_96_DW_1mL(name='plate_01')
+    plt_car[1] = Cos_96_DW_1mL(name='plate_02')
+    plt_car[2] = Cos_96_DW_1mL(name='plate_03')
+
+    lh.deck.assign_child_resource(plt_car, rails=8)
+
+    tiprack = lh.get_resource("tips_01")
+
+    await sb.fill_tip_rack(tiprack)
+
+    tips4 = lh.get_resource("tips_04")
+    await sb.edit_tips(tips4, pattern=[[True]*6 + [False]*6]*8)
+    await sb.edit_tips(lh.get_resource("tips_03"), pattern=[[True, False]*6]*8)
+    await sb.edit_tips(lh.get_resource("tips_02"), pattern=[[True, True, False, False]*3]*8)
+
+    plate_1 = lh.get_resource("plate_01")
+    plate_2 = lh.get_resource("plate_02")
+
+    await sb.adjust_well_volume(plate_1, pattern=[[500]*12]*8)
+    await sb.adjust_well_volume(plate_2, pattern=[[100, 500]*6]*8)
+
+    plate_1.set_well_volumes([[500]*12]*8)
+    plate_2.set_well_volumes([[100, 500]*6]*8)
+
+    tip_0 = lh.get_resource("tips_01")
+    await lh.pick_up_tips(tip_0["A1", "B2", "C3", "D4"])
+    await lh.drop_tips(tip_0["A1", "B2", "C3", "D4"])
+
+    await lh.pick_up_tips(tip_0["A1"])
+    plate = lh.get_resource("plate_01")
+    await lh.aspirate(plate["A2"], vols=[300])
+    await lh.dispense(plate_2["A1"], vols=[300])
+    await lh.drop_tips(tip_0["A1"])
+
+    await lh.pick_up_tips96(tiprack)
+    await lh.aspirate_plate(plt_car[0].resource, volume=200)
+    await lh.dispense_plate(plt_car[2].resource, volume=200)
+    await lh.drop_tips96(tiprack)
+
+    await lh.stop()
+
+asyncio.run(main())`;
+
+export default function Home() {
+  const [scriptCode, setScriptCode] = useState<string>(DEFAULT_SCRIPT_CODE);
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">pages/index.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700/10 after:dark:from-sky-900 after:dark:via-[#0141ff]/40 before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`${inter.className} mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p
-            className={`${inter.className} m-0 max-w-[30ch] text-sm opacity-50`}
-          >
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`${inter.className} mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p
-            className={`${inter.className} m-0 max-w-[30ch] text-sm opacity-50`}
-          >
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`${inter.className} mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p
-            className={`${inter.className} m-0 max-w-[30ch] text-sm opacity-50`}
-          >
-            Discover and deploy boilerplate example Next.js&nbsp;projects.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`${inter.className} mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p
-            className={`${inter.className} m-0 max-w-[30ch] text-sm opacity-50`}
-          >
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
+    <div className="grid grid-cols-2 gap-4">
+      <Editor 
+        className="h-screen"
+        theme="vs-dark"
+        onChange={(value) => {
+          setScriptCode(value ?? '');
+        }}
+        defaultLanguage="python"
+        defaultValue={DEFAULT_SCRIPT_CODE}
+      />
+      <SimulatorPane scriptCode={scriptCode} />
+    </div>
+  );
 }
