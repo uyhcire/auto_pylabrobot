@@ -1,0 +1,117 @@
+# Documentation
+
+## asyncio
+
+The script should be structured as an asyncio program.
+
+```
+import asyncio
+
+async def main():
+    # ...
+
+asyncio.run(main())
+```
+
+## Backend and resources
+
+To write a script for a Hamilton STAR and run it on a simulator, import the backend, the deck, and the resources needed:
+
+```
+from pylabrobot.liquid_handling import LiquidHandler
+from pylabrobot.liquid_handling.backends.simulation.simulator_backend import SimulatorBackend
+from pylabrobot.resources.hamilton import STARLetDeck
+from pylabrobot.resources import ...
+```
+
+Common resources:
+
+- `TIP_CAR_480_A00` (tip carrier)
+- `PLT_CAR_L5AC_A00` (plate carrier)
+- `Cos_96_DW_1mL` (a kind of plate)
+- `HTF_L` (Rack with 96 1000ul High Volume Tip with filter)
+
+## Setup
+
+```
+sb = SimulatorBackend(open_browser=False)
+deck = ...
+    
+lh = LiquidHandler(backend=sb, deck=deck)
+
+await lh.setup()
+sb.wait_for_connection()
+```
+
+## Deck layout declaration
+
+Assuming a `LiquidHandler` instance named `lh`, the deck's layout can be declared by instantiating resources and calling `lh.deck.assign_child_resource(...)`. For example, for a hypothetical resource named `FooCarrier`:
+
+```
+foo_car = FooCarrier(name="foo carrier")
+foo_car[0] = Foo(name="foo_1")
+lh.deck.assign_child_resource(foo_car, rails=3)
+```
+
+## Instantiating and initializing resources
+
+Each labware must be instantiated before use, using `lh.get_resource`, e.g. `lh.get_resource("foo_1")`. 
+
+After instantiating each tip rack, make sure to fill it up:
+
+```
+await backend.fill_tip_rack(tip_rack)
+```
+
+After instantiating each plate (or other source of liquid), make sure to fill it up:
+
+```
+# If each well has 500 uL
+await sb.adjust_well_volume(plate_1, pattern=[[500]*12]*8)
+```
+
+## Performing liquid transfers
+
+Please only use the following methods:
+
+- `await lh.pick_up_tips(location)`
+- `await lh.aspirate(location, vols)`
+- `await lh.dispense(location, vols)`
+- `await lh.drop_tips(location)`
+
+Each liquid handling method as input labware and coordinates, e.g. `foo_tip_rack["A1"]` or `foo_plate["A1:B1"]` or `foo_plate["A1", "B1"]`.
+
+Each applicable liquid handling method also takes as input a `vols` kwarg, which must specify a list of volumes.
+
+### Iteration and indexing
+
+To iterate over a resource:
+
+```
+for well in foo_plate["A1:H12"]`:
+    lh.aspirate(well, ...)
+    # ...
+```
+
+Valid and invalid ways of indexing:
+
+```
+plate["A1:E1"]  # valid
+plate[range(5)]  # valid
+plate["A5"]  # valid
+plate[well]  # invalid!
+```
+
+## Finishing up
+
+Always run `await lh.stop()` at the end of the script.
+
+# Approach
+
+- Plan the liquid transfers
+- Write code:
+  - Set up the relevant backend
+  - Declare the "deck layout". Which plates and racks are to be used, and where are they located?
+  - Perform the liquid transfers
+
+Throughout the code, print as many progress messages as possible.
